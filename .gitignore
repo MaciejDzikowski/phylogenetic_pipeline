@@ -1,0 +1,9 @@
+data/
+data_test
+
+.idea/
+__pycache__/
+bin/
+venv/
+
+*.odg
