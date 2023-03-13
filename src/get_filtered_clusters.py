@@ -15,13 +15,14 @@ import os
 def get_filtered_clusters(species_file: str, input_dir: str, output_dir: str, not121: int):
     """
     This script filters out all clusters from `input_dir` with one sequence for each species ("1 to 1") from `species_file`.
+    If `not121` parameter is set, filters out only clusters with fewer sequences than a given number (no_sequences < `not121`).
     Then, replaces all headers with corresponding species names and saves the output in `output_path` directory.
     """
     species = parse_species(species_file)
     if not121:
         filtered = get_all_clusters(input_dir, species, not121)
     else:
-        filtered = get_not121_clusters(input_dir, species)
+        filtered = get_121_clusters(input_dir, species)
     unify_headers(output_dir, species, filtered)
 
 
@@ -38,7 +39,7 @@ def parse_species(species_file: str) -> dict[str, str]:
     return species
 
 
-def get_not121_clusters(input_dir: str, species: dict[str, str]) -> list[str]:
+def get_121_clusters(input_dir: str, species: dict[str, str]) -> list[str]:
     """
     Filters out all clusters from `input_dir` with exactly one sequence for each species from `species` dictionary.
     """
@@ -46,25 +47,35 @@ def get_not121_clusters(input_dir: str, species: dict[str, str]) -> list[str]:
     clusters_files = glob.glob(f"{input_dir}/{no_species}_*.fasta")
     filtered = []
     for cluster_file in clusters_files:
-        is_full = set()
-        with open(cluster_file, "r") as file:
-            for line in file:
-                if line.startswith(">"):
-                    is_full.add(species[line.split()[-1]])
-        if len(is_full) == no_species:
+        if get_no_unique_species(cluster_file, species) == no_species:
             filtered.append(cluster_file)
     return filtered
 
 
 def get_all_clusters(input_dir: str, species: dict[str, str], threshold: int) -> list[str]:
     """
-    Filters out all clusters from `input_dir` with exactly one sequence for each species from `species` dictionary.
+    Filters out all clusters from `input_dir` with fewer sequences than a given number (no_sequences < `not121`).
     """
-    no_species = len(species)
     clusters_files = glob.glob(f"{input_dir}/*.fasta")
     for i in range(threshold):
         clusters_files = [file for file in clusters_files if not file.split("/")[-1].startswith(f"{str(i)}_")]
-    return clusters_files
+    filtered = []
+    for cluster_file in clusters_files:
+        if get_no_unique_species(cluster_file, species) >= threshold:
+            filtered.append(cluster_file)
+    return filtered
+
+
+def get_no_unique_species(cluster_file: str, species: dict[str, str]) -> int:
+    """
+    Returns a number of unique species found in a given file (`cluster_file`).
+    """
+    found_species = set()
+    with open(cluster_file, "r") as file:
+        for line in file:
+            if line.startswith(">"):
+                found_species.add(species[line.split()[-1]])
+    return len(found_species)
 
 
 def unify_headers(output_dir: str, species: dict[str, str], files: list[str]):
@@ -89,7 +100,7 @@ def unify_headers(output_dir: str, species: dict[str, str], files: list[str]):
                     output_file.write(f">{species_name}{distinction_mark}\n")
                 else:
                     output_file.write(line)
-    # FIX should have checked if sequences from different species
+
 
 if __name__ == "__main__":
     get_filtered_clusters()
